@@ -1,0 +1,1 @@
+{"timestamp":"2025-11-10T10:31:24.638+0000","status":500,"error":"Internal Server Error","message":"Error resolving template [api/convert], template might not exist or might not be accessible by any of the configured Template Resolvers","path":"/api/convert"}
