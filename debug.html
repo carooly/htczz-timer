@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Test</title>
+</head>
+<body>
+    <script>
+        // 测试所有需要的DOM元素
+        const elementIds = [
+            'timerDisplay', 'startPauseBtn', 'resetBtn', 'layoutBtn', 'settingsBtn', 
+            'helpBtn', 'controlPanel', 'statusIndicator', 'settingsPanel', 'closeSettings',
+            'helpPanel', 'closeHelp', 'backgroundContainer', 'backgroundOverlay', 
+            'backgroundMusic', 'bgEffectSelect', 'bgRandomCheckbox', 'volumeSlider', 
+            'volumeValue', 'musicModeSelect', 'musicEnabledCheckbox', 'themeSelect', 
+            'fontSizeSlider', 'fontSizeValue', 'imageSelect', 'musicSelect', 'customIntervalInput'
+        ];
+        
+        console.log("Checking DOM elements...");
+        elementIds.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                console.log(`✓ Found: ${id}`);
+            } else {
+                console.error(`✗ Missing: ${id}`);
+            }
+        });
+    </script>
+</body>
+</html>

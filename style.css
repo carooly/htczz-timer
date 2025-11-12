@@ -1,0 +1,582 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+    overflow: hidden;
+    position: relative;
+    transition: background-color 0.5s ease;
+}
+
+/* 背景图片容器 */
+.background-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    /* 背景图片的排列方式为： 水平方向平铺，垂直方向居中 */
+    background-size: cover;  
+    background-position: center;
+    background-repeat: no-repeat;
+    transition: opacity 1.5s ease-in-out;
+}
+
+.background-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    z-index: -1;
+    transition: opacity 0.5s ease;
+}
+
+/* 计时器显示 */
+.timer-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+    transition: all 0.3s ease;
+}
+
+/* PC端默认字体大小设置 - 20%视口宽度 */
+.timer-display {
+    font-size: 20vw;
+    font-weight: 700;
+    color: white;
+    font-family: 'Courier New', monospace;
+    text-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+    text-align: center;
+    transition: all 0.3s ease;
+    line-height: 1;
+}
+
+/* 控制面板 */
+.control-panel {
+    position: fixed;
+    background-color: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 15px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    display: flex;
+    gap: 10px;
+    z-index: 10;
+    transition: all 0.3s ease;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.control-panel.visible {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* 竖屏布局 */
+body.portrait .control-panel {
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: row;
+}
+
+/* 横屏布局 */
+body.landscape .control-panel {
+    right: 30px;
+    top: 50%;
+    transform: translateY(-50%);
+    flex-direction: column;
+}
+
+.control-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(5px);
+}
+
+.control-btn:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+.control-btn:active {
+    transform: scale(0.95);
+}
+
+/* 状态指示器 */
+.status-indicator {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 5;
+}
+
+/* 帮助面板中的模式信息样式 */
+.mode-info {
+    background: #f8f9fa;
+    border-left: 4px solid #4fc3f7;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 8px;
+}
+
+.mode-info p {
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.mode-info strong {
+    min-width: 80px;
+    display: inline-block;
+}
+
+.mode-online { color: #28a745; font-weight: bold; }
+.mode-offline { color: #dc3545; font-weight: bold; }
+.mode-pwa { color: #007bff; font-weight: bold; }
+
+.status-online { color: #28a745; font-weight: bold; }
+.status-offline { color: #dc3545; font-weight: bold; }
+
+.app-pwa { color: #007bff; font-weight: bold; }
+.app-browser { color: #6c757d; font-weight: bold; }
+
+.pwa-install-section {
+    background: #e8f5e8;
+    border: 1px solid #c8e6c9;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    text-align: center;
+}
+
+.pwa-install-section h4 {
+    color: #2e7d32;
+    margin: 0 0 10px 0;
+}
+
+.pwa-install-section p {
+    color: #455a64;
+    margin: 0 0 15px 0;
+    font-size: 14px;
+}
+
+.install-btn {
+    background: #4fc3f7;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 25px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.install-btn:hover {
+    background: #29b6f6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.install-btn:active {
+    transform: translateY(0);
+}
+
+.install-tip {
+    font-size: 12px !important;
+    color: #78909c !important;
+    margin-top: 10px !important;
+    font-style: italic;
+}
+
+/* 更新通知样式 */
+.update-notification {
+    position: fixed;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(33, 150, 243, 0.95);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    z-index: 2000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: slideDown 0.3s ease-out;
+}
+
+.update-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.update-content button {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.update-content button:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateX(-50%) translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+}
+
+.status-indicator.visible {
+    opacity: 1;
+}
+
+/* 设置面板 */
+.settings-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    padding: 30px;
+    color: white;
+    transform: translateY(100%);
+    transition: transform 0.4s ease;
+    overflow-y: auto;
+}
+
+.settings-panel.visible {
+    transform: translateY(0);
+}
+
+.settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.settings-title {
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.close-settings {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 30px;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.settings-tabs {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 10px 0;
+    font-size: 16px;
+    cursor: pointer;
+    width: 33.33%;
+    text-align: center;
+    transition: all 0.3s;
+}
+
+.tab-btn.active {
+    color: #4fc3f7;
+    border-bottom: 2px solid #4fc3f7;
+}
+
+.settings-content {
+    display: none;
+}
+
+.settings-content.active {
+    display: block;
+}
+
+.settings-section {
+    margin-bottom: 30px;
+}
+
+.section-title {
+    font-size: 18px;
+    margin-bottom: 15px;
+    color: #4fc3f7;
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 10px 0;
+}
+
+.slider-container {
+    width: 70%;
+    display: flex;
+    align-items: center;
+}
+
+.slider {
+    flex: 1;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.2);
+    outline: none;
+    border-radius: 5px;
+}
+
+.slider-value {
+    min-width: 40px;
+    text-align: right;
+    margin-left: 10px;
+}
+
+/* 帮助面板 */
+.help-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    padding: 30px;
+    color: white;
+    transform: translateY(100%);
+    transition: transform 0.4s ease;
+    overflow-y: auto;
+}
+
+.help-panel.visible {
+    transform: translateY(0);
+}
+
+.help-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.help-title {
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.close-help {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 30px;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.help-content {
+    line-height: 1.6;
+}
+
+.help-content h3 {
+    margin: 20px 0 10px;
+    color: #4fc3f7;
+}
+
+.help-content ul {
+    margin-left: 20px;
+    margin-bottom: 20px;
+}
+
+.help-content li {
+    margin-bottom: 8px;
+}
+
+/* 响应式调整 */
+/* 手机竖屏模式字体大小设置 - 25%视口宽度（适用于屏幕宽度≤768px的设备） */
+@media (max-width: 768px) {
+    .timer-display {
+        font-size: 25vw;
+    }
+    
+    .control-btn {
+        width: 55px;
+        height: 55px;
+        font-size: 22px;
+    }
+    
+    .settings-panel, .help-panel {
+        padding: 20px;
+    }
+}
+
+/* 手机横屏模式字体大小设置 - 20%视口宽度（适用于屏幕高度≤500px且为横屏的设备） */
+@media (max-height: 500px) and (orientation: landscape) {
+    .timer-display {
+        font-size: 20vw;
+    }
+}
+
+/* 背景间隔选项样式 */
+.interval-options {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 70%;
+}
+
+.interval-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.interval-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.interval-btn.active {
+    background: #4fc3f7;
+    border-color: #4fc3f7;
+}
+
+.custom-interval {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.custom-interval input {
+    width: 60px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 5px;
+    border-radius: 3px;
+    text-align: center;
+}
+
+.custom-interval span {
+    font-size: 14px;
+}
+/* 图片选择下拉框样式 */
+.image-select {
+    width: 70%;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 8px;
+    border-radius: 5px;
+    font-size: 14px;
+    outline: none;
+    cursor: pointer;
+}
+
+.image-select option {
+    background: #333;
+    color: white;
+}
+
+/* 安装提示按钮 */
+/* 安装提示按钮 */
+.install-prompt {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #4fc3f7;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 20px;
+    font-size: 14px;
+    z-index: 1000;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.install-prompt:hover {
+    background: #29b6f6;
+    transform: scale(1.05);
+}
+
+/* 离线状态指示器 */
+.offline-indicator {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 152, 0, 0.9);
+    color: white;
+    padding: 5px 15px;
+    border-radius: 15px;
+    font-size: 12px;
+    z-index: 1000;
+}
