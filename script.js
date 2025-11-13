@@ -292,19 +292,69 @@ function reloadForUpdate() {
 
 // 检测屏幕方向
 function detectOrientation() {
-    const isPortrait = window.innerHeight > window.innerWidth;
-    document.body.className = isPortrait ? 'portrait' : 'landscape';
+    // 设置初始方向类
+    updateOrientationClasses();
     
-    // 监听屏幕方向变化
+    // 监听窗口大小变化（基本的方向变化检测）
     window.addEventListener('resize', () => {
-        const isPortrait = window.innerHeight > window.innerWidth;
-        document.body.className = isPortrait ? 'portrait' : 'landscape';
+        updateOrientationClasses();
         
         // 重新加载背景图片
         loadBackgroundImages();
         // 应用当前背景图片
         if (backgroundImages.length > 0) {
             backgroundContainer.style.backgroundImage = `url('${backgroundImages[currentBgIndex % backgroundImages.length]}')`;
+        }
+    });
+    
+    // 监听设备方向变化（对于PWA特别重要）
+    if ('screen' in window && 'orientation' in window.screen) {
+        // 标准方向变化事件
+        window.screen.orientation.addEventListener('change', () => {
+            updateOrientationClasses();
+            
+            // 重新加载背景图片
+            loadBackgroundImages();
+            // 应用当前背景图片
+            if (backgroundImages.length > 0) {
+                backgroundContainer.style.backgroundImage = `url('${backgroundImages[currentBgIndex % backgroundImages.length]}')`;
+            }
+        });
+    }
+    
+    // 回退：监听设备方向变化事件
+    if (window.DeviceOrientationEvent) {
+        window.addEventListener('deviceorientation', handleDeviceOrientationChange, true);
+    }
+}
+
+// 更新方向相关的CSS类
+function updateOrientationClasses() {
+    const isPortrait = window.innerHeight > window.innerWidth;
+    
+    // 移除旧的方向类并添加新的
+    document.body.classList.remove('portrait', 'landscape');
+    document.body.classList.add(isPortrait ? 'portrait' : 'landscape');
+}
+
+// 处理设备方向变化（回退方案）
+function handleDeviceOrientationChange() {
+    // 使用requestAnimationFrame确保在UI线程空闲时执行
+    window.requestAnimationFrame(() => {
+        const isPortrait = window.innerHeight > window.innerWidth;
+        const currentOrientation = document.body.classList.contains('portrait') ? 'portrait' : 'landscape';
+        
+        // 仅在方向确实变化时更新
+        if ((isPortrait && currentOrientation !== 'portrait') || 
+            (!isPortrait && currentOrientation !== 'landscape')) {
+            updateOrientationClasses();
+            
+            // 重新加载背景图片
+            loadBackgroundImages();
+            // 应用当前背景图片
+            if (backgroundImages.length > 0) {
+                backgroundContainer.style.backgroundImage = `url('${backgroundImages[currentBgIndex % backgroundImages.length]}')`;
+            }
         }
     });
 }
@@ -372,9 +422,8 @@ function updateMusicList() {
     
     // 添加空白选项作为第一项
     let html = '<option value="">选择音频文件...</option>';
-    musicFiles.forEach((musicUrl, index) => {
-        const fileName = musicUrl.split('/').pop(); // 获取文件名
-        html += `<option value="${index}">${fileName} (${musicUrl})</option>`;
+    musicFiles.forEach((music, index) => {
+        html += `<option value="${index}">${music.name}</option>`;
     });
     
     musicSelect.innerHTML = html;
@@ -390,20 +439,34 @@ function preloadAudio(url) {
 
 // 加载背景音乐
 function loadBackgroundMusic() {
-	// 使用本地mp3目录下的音乐
+	// 使用opus格式音频文件，并支持动态码率适配
     musicFiles = [
-        './mp3/music1.mp3',
-        './mp3/music2.mp3'
+        {
+            name: 'music1.opus',
+            sources: [
+                { url: './mp3/music1.opus', type: 'audio/opus', bitrate: '128k' }
+                // 可以在这里添加更多不同码率的版本
+            ]
+        },
+        {
+            name: 'music2.opus', 
+            sources: [
+                { url: './mp3/music2.opus', type: 'audio/opus', bitrate: '128k' }
+                // 可以在这里添加更多不同码率的版本
+            ]
+        }
     ];
     
     // 预加载所有音乐文件
-    musicFiles.forEach(file => {
-        preloadAudio(file);
+    musicFiles.forEach(music => {
+        // 预加载默认版本
+        preloadAudio(music.sources[0].url);
     });
     
 	// 设置第一首音乐
     if (musicFiles.length > 0) {
-        backgroundMusic.src = musicFiles[0];
+        // 使用动态码率适配加载音频
+        setAudioSourceWithAdaptiveBitrate(backgroundMusic, musicFiles[0]);
         backgroundMusic.volume = musicVolume;
         
         // 预加载音乐
@@ -412,6 +475,64 @@ function loadBackgroundMusic() {
     
     // 更新音频列表显示
     updateMusicList();
+}
+
+// 根据网络状况动态选择音频码率
+function setAudioSourceWithAdaptiveBitrate(audioElement, musicData) {
+    // 清除之前的source元素
+    while (audioElement.firstChild) {
+        audioElement.removeChild(audioElement.firstChild);
+    }
+    
+    // 根据网络状况选择最佳码率
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    let selectedSource;
+    
+    if (connection) {
+        // 检测网络类型和有效带宽
+        const effectiveType = connection.effectiveType || '4g'; // 获取网络类型
+        
+        console.log('当前网络类型:', effectiveType);
+        
+        // 根据网络类型选择合适的码率
+        if (effectiveType.includes('2g') || effectiveType.includes('slow-2g')) {
+            // 2G网络选择最低码率
+            selectedSource = musicData.sources[0]; // 使用默认码率
+        } else if (effectiveType.includes('3g')) {
+            // 3G网络选择中等码率
+            selectedSource = musicData.sources.find(s => s.bitrate === '128k') || musicData.sources[0];
+        } else {
+            // 4G/5G/WiFi选择高质量码率
+            selectedSource = musicData.sources[0]; // 使用默认码率
+        }
+    } else {
+        // 无法检测网络状况，使用默认码率
+        selectedSource = musicData.sources[0];
+    }
+    
+    // 创建source元素
+    const sourceElement = document.createElement('source');
+    sourceElement.src = selectedSource.url;
+    sourceElement.type = selectedSource.type;
+    
+    // 添加source元素到audio标签
+    audioElement.appendChild(sourceElement);
+    
+    // 同时设置fallback src
+    audioElement.src = selectedSource.url;
+    
+    console.log(`已选择音频: ${selectedSource.url} (${selectedSource.bitrate})`);
+    
+    // 监听网络变化，动态调整音频质量
+    if (connection) {
+        connection.addEventListener('change', () => {
+            // 只在音频未播放时重新选择码率
+            if (audioElement.paused) {
+                console.log('网络状况变化，重新选择音频码率');
+                setAudioSourceWithAdaptiveBitrate(audioElement, musicData);
+            }
+        });
+    }
 }
 
 
@@ -589,8 +710,20 @@ function toggleControlPanel() {
 // 切换屏幕布局
 function toggleLayout() {
     const isPortrait = document.body.classList.contains('portrait');
-    document.body.className = isPortrait ? 'landscape' : 'portrait';
+    
+    // 移除现有方向类
+    document.body.classList.remove('portrait', 'landscape');
+    // 添加相反的方向类
+    document.body.classList.add(isPortrait ? 'landscape' : 'portrait');
+    
     if (layoutBtn) layoutBtn.textContent = isPortrait ? '↔️' : '↕️';
+    
+    // 重新加载背景图片以匹配新布局
+    loadBackgroundImages();
+    // 应用当前背景图片
+    if (backgroundImages.length > 0) {
+        backgroundContainer.style.backgroundImage = `url('${backgroundImages[currentBgIndex % backgroundImages.length]}')`;
+    }
 }
 
 // 显示设置面板
@@ -840,8 +973,8 @@ function setupEventListeners() {
                 return;
             }
             
-            // 预览播放对应的音频
-            backgroundMusic.src = musicFiles[index];
+            // 预览播放对应的音频，使用动态码率适配
+            setAudioSourceWithAdaptiveBitrate(backgroundMusic, musicFiles[index]);
             backgroundMusic.volume = musicVolume;
             backgroundMusic.play().catch(e => {
                 console.log('音频播放被阻止，需要用户交互');

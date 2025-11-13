@@ -19,8 +19,8 @@ const urlsToCache = [
     './img/portrait/portrait-bg4.jpg',
     './img/landscape/landscape-bg1.jpg',
     './img/landscape/landscape-bg2.jpg',
-    './mp3/music1.mp3',
-    './mp3/music2.mp3'
+    './mp3/music1.opus',
+    './mp3/music2.opus'
 ];
 
 // 安装Service Worker
