@@ -51,52 +51,52 @@ self.addEventListener('activate', function(event) {
                     }
                 })
             );
-        }).then(() => {
-            // 通知所有客户端有新版本可用
-            self.clients.matchAll().then(clients => {
-                clients.forEach(client => {
-                    client.postMessage({
-                        type: 'SW_UPDATED',
-                        version: CACHE_NAME
-                    });
-                });
-            });
+        })
+        .then(() => {
+            console.log('Service Worker激活成功');
             return self.clients.claim();
         })
     );
 });
 
-// 拦截网络请求
+// 监听fetch事件
 self.addEventListener('fetch', function(event) {
     event.respondWith(
         caches.match(event.request)
             .then(function(response) {
-                // 如果缓存中有请求的资源，则返回缓存版本
+                // 如果在缓存中找到资源，则直接返回
                 if (response) {
                     return response;
                 }
                 
-                // 否则从网络获取
-                return fetch(event.request).then(function(response) {
-                    // 检查是否为有效响应
-                    if (!response || response.status !== 200 || response.type !== 'basic') {
+                // 否则，发起网络请求
+                return fetch(event.request).then(
+                    function(response) {
+                        // 检查响应是否有效
+                        if (!response || response.status !== 200 || response.type !== 'basic') {
+                            return response;
+                        }
+                        
+                        // 克隆响应，因为响应流只能使用一次
+                        const responseToCache = response.clone();
+                        
+                        // 缓存新的响应
+                        caches.open(CACHE_NAME)
+                            .then(function(cache) {
+                                cache.put(event.request, responseToCache);
+                            });
+                        
                         return response;
                     }
-                    
-                    // 克隆响应以进行缓存
-                    const responseToCache = response.clone();
-                    
-                    caches.open(CACHE_NAME)
-                        .then(function(cache) {
-                            cache.put(event.request, responseToCache);
-                        });
-                    
-                    return response;
-                }).catch(function() {
-                    // 网络请求失败时，尝试返回缓存的离线页面
-                    if (event.request.destination === 'document') {
-                        return caches.match('./index.html');
+                ).catch(function() {
+                    // 如果网络请求失败，尝试返回离线页面
+                    if (event.request.mode === 'navigate') {
+                        return caches.match('./');
                     }
+                    return new Response('网络连接失败', {
+                        status: 408,
+                        headers: { 'Content-Type': 'text/plain' }
+                    });
                 });
             })
     );

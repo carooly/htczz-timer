@@ -198,475 +198,552 @@ function updateHelpPanelModeInfo(mode, modeText, isOnline, isPWA) {
     }
     
     if (networkStatus) {
-        networkStatus.textContent = isOnline ? '已连接' : '已断开';
+        networkStatus.textContent = isOnline ? '已连接网络' : '未连接网络';
         networkStatus.className = isOnline ? 'status-online' : 'status-offline';
     }
     
     if (appStatus) {
-        appStatus.textContent = isPWA ? 'PWA应用' : '浏览器';
-        appStatus.className = isPWA ? 'app-pwa' : 'app-browser';
+        appStatus.textContent = isPWA ? '已安装为应用' : '浏览器模式运行';
     }
     
-    // 更新安装按钮状态
-    if (installBtn) {
-        if (isPWA) {
-            installBtn.disabled = true;
-            installBtn.textContent = '✅ 已安装';
-            installBtn.style.background = '#9e9e9e';
-        } else {
-            installBtn.disabled = false;
-            installBtn.textContent = '📱 添加到桌面';
-            installBtn.style.background = '#4fc3f7';
-        }
+    if (installBtn && isPWA) {
+        installBtn.style.display = 'none';
+    } else if (installBtn) {
+        installBtn.style.display = 'inline-block';
     }
 }
 
-// 初始化安装按钮事件监听器
+// 初始化PWA安装按钮
 function initPWAInstallButton() {
+    // 检测是否支持安装
+    let deferredPrompt;
     const installBtn = document.getElementById('installPWA');
-    if (installBtn) {
-        installBtn.addEventListener('click', function() {
-            if (window.showPWAInstall) {
-                window.showPWAInstall();
-            } else {
-                alert('安装功能暂不可用，请稍后重试。');
-            }
-        });
+    
+    if (!installBtn) {
+        console.log('安装按钮元素不存在');
+        return;
     }
+    
+    // 监听beforeinstallprompt事件
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // 阻止Chrome 67及更早版本自动显示安装提示
+        e.preventDefault();
+        // 保存事件以便稍后触发
+        deferredPrompt = e;
+        // 显示安装按钮
+        installBtn.style.display = 'inline-block';
+    });
+    
+    // 点击安装按钮时触发安装
+    installBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) {
+            showStatus('安装不可用', 2000);
+            return;
+        }
+        
+        // 显示安装提示
+        deferredPrompt.prompt();
+        
+        // 等待用户响应
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`用户 ${outcome === 'accepted' ? '接受' : '拒绝'} 了安装`);
+        
+        // 无论结果如何，我们只能使用deferredPrompt一次
+        deferredPrompt = null;
+        
+        // 隐藏安装按钮
+        installBtn.style.display = 'none';
+    });
+    
+    // 检查应用是否已经安装
+    window.addEventListener('appinstalled', () => {
+        console.log('应用已安装');
+        // 隐藏安装按钮
+        if (installBtn) {
+            installBtn.style.display = 'none';
+        }
+    });
 }
 
 // 检查更新
 function checkForUpdates() {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistration().then(registration => {
-            if (registration) {
-                registration.update().then(() => {
-                    console.log('Service Worker更新检查完成');
-                }).catch(error => {
-                    console.log('更新检查失败:', error);
-                });
-            }
+        navigator.serviceWorker.ready.then(registration => {
+            registration.update();
+        }).catch(error => {
+            console.error('检查更新失败:', error);
         });
     }
 }
 
 // 显示更新通知
 function showUpdateNotification(version) {
-    const notification = document.createElement('div');
-    notification.className = 'update-notification';
-    notification.innerHTML = `
+    const updateNotification = document.createElement('div');
+    updateNotification.className = 'update-notification';
+    updateNotification.innerHTML = `
         <div class="update-content">
-            <span>新版本已就绪！</span>
-            <button onclick="reloadForUpdate()">立即更新</button>
-            <button onclick="this.parentElement.parentElement.remove()">稍后</button>
+            <p>有新版本可用</p>
+            <div class="update-actions">
+                <button id="updateNow" class="update-button update-now">立即更新</button>
+                <button id="updateLater" class="update-button update-later">稍后</button>
+            </div>
         </div>
     `;
     
-    document.body.appendChild(notification);
+    document.body.appendChild(updateNotification);
     
-    // 5秒后自动消失
+    // 添加显示动画
     setTimeout(() => {
-        if (notification.parentElement) {
-            notification.remove();
-        }
-    }, 5000);
+        updateNotification.classList.add('show');
+    }, 10);
+    
+    // 立即更新按钮事件
+    document.getElementById('updateNow').addEventListener('click', () => {
+        updateNotification.classList.remove('show');
+        setTimeout(() => {
+            document.body.removeChild(updateNotification);
+            reloadForUpdate();
+        }, 300);
+    });
+    
+    // 稍后按钮事件
+    document.getElementById('updateLater').addEventListener('click', () => {
+        updateNotification.classList.remove('show');
+        setTimeout(() => {
+            document.body.removeChild(updateNotification);
+        }, 300);
+    });
 }
 
 // 重新加载以应用更新
 function reloadForUpdate() {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistration().then(registration => {
-            if (registration) {
-                registration.unregister().then(() => {
-                    window.location.reload();
-                });
-            } else {
-                window.location.reload();
-            }
-        });
-    } else {
+    // 显示更新中提示
+    const updateStatus = document.createElement('div');
+    updateStatus.className = 'update-status';
+    updateStatus.textContent = '正在更新...';
+    document.body.appendChild(updateStatus);
+    
+    // 延迟重新加载，让用户有时间看到提示
+    setTimeout(() => {
         window.location.reload();
-    }
+    }, 1000);
 }
-
 
 // 检测屏幕方向
 function detectOrientation() {
-    // 设置初始方向类
+    // 添加事件监听器来检测方向变化
+    window.addEventListener('resize', handleOrientationChange);
+    window.addEventListener('orientationchange', handleOrientationChange);
+    
+    // 初始化时检测一次
+    handleOrientationChange();
+    
+    // 定期检查，确保方向正确
+    setInterval(handleOrientationChange, 1000);
+    
+    // 添加触摸事件监听器来检测设备方向
+    window.addEventListener('touchmove', handleDeviceOrientationChange, { passive: true });
+    
+    // 初始设置方向类
     updateOrientationClasses();
-    
-    // 监听窗口大小变化（基本的方向变化检测）
-    window.addEventListener('resize', () => {
-        updateOrientationClasses();
-        
-        // 重新加载背景图片
-        loadBackgroundImages();
-        // 应用当前背景图片
-        if (backgroundImages.length > 0) {
-            backgroundContainer.style.backgroundImage = `url('${backgroundImages[currentBgIndex % backgroundImages.length]}')`;
-        }
-    });
-    
-    // 监听设备方向变化（对于PWA特别重要）
-    if ('screen' in window && 'orientation' in window.screen) {
-        // 标准方向变化事件
-        window.screen.orientation.addEventListener('change', () => {
-            updateOrientationClasses();
-            
-            // 重新加载背景图片
-            loadBackgroundImages();
-            // 应用当前背景图片
-            if (backgroundImages.length > 0) {
-                backgroundContainer.style.backgroundImage = `url('${backgroundImages[currentBgIndex % backgroundImages.length]}')`;
-            }
-        });
-    }
-    
-    // 回退：监听设备方向变化事件
-    if (window.DeviceOrientationEvent) {
-        window.addEventListener('deviceorientation', handleDeviceOrientationChange, true);
-    }
 }
 
 // 更新方向相关的CSS类
 function updateOrientationClasses() {
     const isPortrait = window.innerHeight > window.innerWidth;
     
-    // 移除旧的方向类并添加新的
-    document.body.classList.remove('portrait', 'landscape');
-    document.body.classList.add(isPortrait ? 'portrait' : 'landscape');
+    if (isPortrait) {
+        document.body.classList.add('orientation-portrait');
+        document.body.classList.remove('orientation-landscape');
+    } else {
+        document.body.classList.add('orientation-landscape');
+        document.body.classList.remove('orientation-portrait');
+    }
 }
 
-// 处理设备方向变化（回退方案）
+// 处理设备方向变化
 function handleDeviceOrientationChange() {
-    // 使用requestAnimationFrame确保在UI线程空闲时执行
-    window.requestAnimationFrame(() => {
-        const isPortrait = window.innerHeight > window.innerWidth;
-        const currentOrientation = document.body.classList.contains('portrait') ? 'portrait' : 'landscape';
-        
-        // 仅在方向确实变化时更新
-        if ((isPortrait && currentOrientation !== 'portrait') || 
-            (!isPortrait && currentOrientation !== 'landscape')) {
-            updateOrientationClasses();
-            
-            // 重新加载背景图片
-            loadBackgroundImages();
-            // 应用当前背景图片
-            if (backgroundImages.length > 0) {
-                backgroundContainer.style.backgroundImage = `url('${backgroundImages[currentBgIndex % backgroundImages.length]}')`;
-            }
+    // 尝试锁定屏幕方向为自动
+    if (screen.orientation && screen.orientation.lock) {
+        // 优先尝试 'any'，如果失败则尝试具体方向
+        screen.orientation.lock('any')
+            .then(() => console.log('屏幕方向已锁定为自动'))
+            .catch(error => {
+                console.warn('无法锁定屏幕方向:', error);
+                // 如果 any 失败，尝试其他可能的方向
+                tryLockOrientation(['portrait', 'landscape']);
+            });
+    } else if (screen.lockOrientation) {
+        // 旧版API
+        const lockSuccess = screen.lockOrientation('default');
+        if (lockSuccess) {
+            console.log('使用旧版API锁定屏幕方向');
+        } else {
+            console.warn('旧版API锁定屏幕方向失败');
+        }
+    } else {
+        console.log('设备不支持屏幕方向锁定');
+    }
+}
+
+// 尝试锁定到多个可能的方向
+function tryLockOrientation(orientations) {
+    if (!screen.orientation || !screen.orientation.lock) return;
+    
+    orientations.forEach(orientation => {
+        try {
+            screen.orientation.lock(orientation)
+                .then(() => {
+                    console.log(`成功锁定到${orientation}方向`);
+                    return true;
+                })
+                .catch(() => console.warn(`无法锁定到${orientation}方向`));
+        } catch (e) {
+            console.warn(`尝试锁定到${orientation}方向时出错:`, e);
         }
     });
 }
 
-// 加载背景图片
-function loadBackgroundImages() {
-    // 根据屏幕方向加载不同的背景图片
+// 处理窗口大小和方向变化
+function handleOrientationChange() {
+    // 更新方向相关的CSS类
+    updateOrientationClasses();
+    
+    // 刷新布局
+    refreshLayout();
+    
+    // 根据方向调整UI元素
+    adjustUIForOrientation();
+}
+
+// 刷新布局
+function refreshLayout() {
+    // 重置和重新计算布局
+    if (timerDisplay) {
+        // 确保计时器大小正确
+        timerDisplay.style.fontSize = 'calc(10vmin + 5vmax)';
+    }
+}
+
+// 根据方向调整UI
+function adjustUIForOrientation() {
     const isPortrait = window.innerHeight > window.innerWidth;
     
-    if (isPortrait) {
-        // 竖屏设备使用竖屏背景图片
-        backgroundImages = [
-            './img/portrait/portrait-bg1.jpg',
-            './img/portrait/portrait-bg2.jpg',
-            './img/portrait/portrait-bg3.jpg',
-            './img/portrait/portrait-bg4.jpg'
-        ];
-    } else {
-        // 横屏设备使用横屏背景图片
-        backgroundImages = [
-            './img/landscape/landscape-bg1.jpg',
-            './img/landscape/landscape-bg2.jpg'
-        ];
+    // 调整控制按钮布局
+    if (controlPanel) {
+        if (isPortrait) {
+            controlPanel.classList.remove('horizontal-layout');
+            controlPanel.classList.add('vertical-layout');
+        } else {
+            controlPanel.classList.remove('vertical-layout');
+            controlPanel.classList.add('horizontal-layout');
+        }
     }
+    
+    // 调整字体大小以适应屏幕
+    updateFontSize();
+}
 
-	// 预加载图片
-    backgroundImages.forEach(imgUrl => {
-        const img = new Image();
-        img.src = imgUrl;
-    });
-    
-    // 设置第一张背景
-    if (backgroundImages.length > 0) {
-        backgroundContainer.style.backgroundImage = `url('${backgroundImages[0]}')`;
+// 更新字体大小
+function updateFontSize() {
+    if (timerDisplay) {
+        const size = fontSizeSlider ? fontSizeSlider.value : 100;
+        const baseSize = isPortrait() ? '5vmax' : '10vmax';
+        timerDisplay.style.fontSize = `calc(${baseSize} * ${size / 100})`;
     }
+}
+
+// 检测是否为竖屏
+function isPortrait() {
+    return window.innerHeight > window.innerWidth;
+}
+
+// 加载背景图片
+function loadBackgroundImages() {
+    // 内置背景图片列表
+    backgroundImages = [
+        { id: 'nature1', name: '自然风景1', url: 'images/nature1.jpg' },
+        { id: 'nature2', name: '自然风景2', url: 'images/nature2.jpg' },
+        { id: 'abstract1', name: '抽象艺术1', url: 'images/abstract1.jpg' },
+        { id: 'abstract2', name: '抽象艺术2', url: 'images/abstract2.jpg' },
+        { id: 'minimal1', name: '极简主义1', url: 'images/minimal1.jpg' },
+        { id: 'minimal2', name: '极简主义2', url: 'images/minimal2.jpg' },
+        { id: 'gradient1', name: '渐变背景1', url: 'images/gradient1.jpg' },
+        { id: 'gradient2', name: '渐变背景2', url: 'images/gradient2.jpg' }
+    ];
     
-    // 更新图片列表显示
+    // 更新下拉列表
     updateImageList();
 }
 
-// 更新图片列表显示
+// 更新图片选择列表
 function updateImageList() {
-    if (backgroundImages.length === 0) {
-        imageSelect.innerHTML = '<option value="">没有找到图片</option>';
-        return;
-    }
+    if (!imageSelect) return;
     
-    let html = '';
-    backgroundImages.forEach((imgUrl, index) => {
-        const isSelected = index === currentBgIndex ? 'selected' : '';
-        html += `<option value="${index}" ${isSelected}>${imgUrl}</option>`;
+    // 清空现有选项
+    imageSelect.innerHTML = '';
+    
+    // 添加选项
+    backgroundImages.forEach((image, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = image.name;
+        if (index === currentBgIndex) {
+            option.selected = true;
+        }
+        imageSelect.appendChild(option);
     });
-    
-    imageSelect.innerHTML = html;
 }
 
-// 更新音频列表显示
+// 更新音乐选择列表
 function updateMusicList() {
     if (!musicSelect) return;
     
-    if (musicFiles.length === 0) {
-        musicSelect.innerHTML = '<option value="">没有找到音频文件</option>';
-        return;
-    }
+    // 清空现有选项
+    musicSelect.innerHTML = '';
     
-    // 添加空白选项作为第一项
-    let html = '<option value="">选择音频文件...</option>';
+    // 添加选项
     musicFiles.forEach((music, index) => {
-        html += `<option value="${index}">${music.name}</option>`;
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = music.name;
+        if (index === currentMusicIndex) {
+            option.selected = true;
+        }
+        musicSelect.appendChild(option);
     });
-    
-    musicSelect.innerHTML = html;
 }
 
-// 预加载音频文件
+// 预加载音频
 function preloadAudio(url) {
     const audio = new Audio();
-    audio.preload = 'auto';
     audio.src = url;
+    audio.load();
     return audio;
 }
 
 // 加载背景音乐
 function loadBackgroundMusic() {
-	// 使用opus格式音频文件，并支持动态码率适配
+    // 背景音乐列表
     musicFiles = [
         {
-            name: 'music1.opus',
-            sources: [
-                { url: './mp3/music1.opus', type: 'audio/opus', bitrate: '128k' }
-                // 可以在这里添加更多不同码率的版本
-            ]
+            id: 'calm1',
+            name: '平静钢琴曲',
+            lowQuality: 'music/calm1_low.mp3',
+            highQuality: 'music/calm1_high.mp3',
+            fallback: 'music/calm1.mp3'
         },
         {
-            name: 'music2.opus', 
-            sources: [
-                { url: './mp3/music2.opus', type: 'audio/opus', bitrate: '128k' }
-                // 可以在这里添加更多不同码率的版本
-            ]
+            id: 'meditation1',
+            name: '冥想音乐',
+            lowQuality: 'music/meditation1_low.mp3',
+            highQuality: 'music/meditation1_high.mp3',
+            fallback: 'music/meditation1.mp3'
+        },
+        {
+            id: 'nature1',
+            name: '自然雨声',
+            lowQuality: 'music/nature1_low.mp3',
+            highQuality: 'music/nature1_high.mp3',
+            fallback: 'music/nature1.mp3'
+        },
+        {
+            id: 'focus1',
+            name: '专注学习',
+            lowQuality: 'music/focus1_low.mp3',
+            highQuality: 'music/focus1_high.mp3',
+            fallback: 'music/focus1.mp3'
         }
     ];
     
-    // 预加载所有音乐文件
-    musicFiles.forEach(music => {
-        // 预加载默认版本
-        preloadAudio(music.sources[0].url);
-    });
-    
-	// 设置第一首音乐
-    if (musicFiles.length > 0) {
-        // 使用动态码率适配加载音频
-        setAudioSourceWithAdaptiveBitrate(backgroundMusic, musicFiles[0]);
-        backgroundMusic.volume = musicVolume;
-        
-        // 预加载音乐
-        backgroundMusic.load();
-    }
-    
-    // 更新音频列表显示
+    // 更新下拉列表
     updateMusicList();
 }
 
-// 根据网络状况动态选择音频码率
+// 根据网络状况自适应设置音频源
 function setAudioSourceWithAdaptiveBitrate(audioElement, musicData) {
-    // 清除之前的source元素
-    while (audioElement.firstChild) {
-        audioElement.removeChild(audioElement.firstChild);
-    }
+    if (!audioElement || !musicData) return;
     
-    // 根据网络状况选择最佳码率
+    // 检测网络状况
     const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    let selectedSource;
+    const isSlowConnection = connection && (connection.effectiveType === '2g' || connection.saveData);
     
-    if (connection) {
-        // 检测网络类型和有效带宽
-        const effectiveType = connection.effectiveType || '4g'; // 获取网络类型
-        
-        console.log('当前网络类型:', effectiveType);
-        
-        // 根据网络类型选择合适的码率
-        if (effectiveType.includes('2g') || effectiveType.includes('slow-2g')) {
-            // 2G网络选择最低码率
-            selectedSource = musicData.sources[0]; // 使用默认码率
-        } else if (effectiveType.includes('3g')) {
-            // 3G网络选择中等码率
-            selectedSource = musicData.sources.find(s => s.bitrate === '128k') || musicData.sources[0];
-        } else {
-            // 4G/5G/WiFi选择高质量码率
-            selectedSource = musicData.sources[0]; // 使用默认码率
-        }
+    // 选择适当的音频质量
+    let audioUrl;
+    
+    if (isSlowConnection) {
+        audioUrl = musicData.lowQuality || musicData.fallback || musicData.url;
     } else {
-        // 无法检测网络状况，使用默认码率
-        selectedSource = musicData.sources[0];
+        audioUrl = musicData.highQuality || musicData.fallback || musicData.url;
     }
     
-    // 创建source元素
-    const sourceElement = document.createElement('source');
-    sourceElement.src = selectedSource.url;
-    sourceElement.type = selectedSource.type;
-    
-    // 添加source元素到audio标签
-    audioElement.appendChild(sourceElement);
-    
-    // 同时设置fallback src
-    audioElement.src = selectedSource.url;
-    
-    console.log(`已选择音频: ${selectedSource.url} (${selectedSource.bitrate})`);
-    
-    // 监听网络变化，动态调整音频质量
-    if (connection) {
-        connection.addEventListener('change', () => {
-            // 只在音频未播放时重新选择码率
-            if (audioElement.paused) {
-                console.log('网络状况变化，重新选择音频码率');
-                setAudioSourceWithAdaptiveBitrate(audioElement, musicData);
-            }
-        });
+    // 设置音频源
+    if (audioUrl) {
+        audioElement.src = audioUrl;
+        return true;
     }
+    
+    return false;
 }
-
 
 // 开始背景图片循环
 function startBackgroundCycle() {
+    // 如果已经有循环，则清除
     if (bgIntervalId) {
         clearInterval(bgIntervalId);
     }
     
-    bgIntervalId = setInterval(() => {
-        changeBackground();
-    }, bgInterval);
+    // 设置新的循环
+    bgIntervalId = setInterval(changeBackground, bgInterval);
 }
 
 // 切换背景图片
 function changeBackground() {
-    if (backgroundImages.length === 0) return;
+    // 检查是否启用了随机模式
+    const useRandom = bgRandomCheckbox && bgRandomCheckbox.checked;
     
-    // 计算下一张图片索引
-    if (bgRandomCheckbox && bgRandomCheckbox.checked) {
-        currentBgIndex = Math.floor(Math.random() * backgroundImages.length);
+    if (useRandom) {
+        // 随机选择一个不重复的背景
+        let newIndex;
+        do {
+            newIndex = Math.floor(Math.random() * backgroundImages.length);
+        } while (newIndex === currentBgIndex && backgroundImages.length > 1);
+        currentBgIndex = newIndex;
     } else {
+        // 顺序切换
         currentBgIndex = (currentBgIndex + 1) % backgroundImages.length;
     }
     
-    // 应用切换效果
-    const effect = bgEffectSelect ? bgEffectSelect.value : 'fade';
-    applyBackgroundEffect(backgroundImages[currentBgIndex], effect);
-    
-    // 更新图片列表显示
-    updateImageList();
-}
-
-// 应用背景切换效果
-function applyBackgroundEffect(imageUrl, effect) {
-    const newBg = document.createElement('div');
-    newBg.className = 'background-container';
-    newBg.style.backgroundImage = `url('${imageUrl}')`;
-    newBg.style.opacity = '0';
-    newBg.style.zIndex = '-3';
-    
-    document.body.appendChild(newBg);
-    
-    // 根据效果类型设置动画
-    switch(effect) {
-        case 'fade':
-            setTimeout(() => {
-                newBg.style.opacity = '1';
-            }, 50);
-            break;
-        case 'slide':
-            newBg.style.transform = 'translateX(100%)';
-            setTimeout(() => {
-                newBg.style.transform = 'translateX(0)';
-                newBg.style.opacity = '1';
-            }, 50);
-            break;
-        case 'zoom':
-            newBg.style.transform = 'scale(1.1)';
-            setTimeout(() => {
-                newBg.style.transform = 'scale(1)';
-                newBg.style.opacity = '1';
-            }, 50);
-            break;
+    // 应用选中的背景
+    const selectedImage = backgroundImages[currentBgIndex];
+    if (selectedImage && selectedImage.url) {
+        applyBackgroundEffect(selectedImage.url, bgEffectSelect ? bgEffectSelect.value : 'normal');
     }
     
-    // 移除旧背景
-    setTimeout(() => {
-        if (document.body.contains(backgroundContainer)) {
-            document.body.removeChild(backgroundContainer);
-        }
-        
-        // 更新背景容器引用
-        backgroundContainer.id = '';
-        newBg.id = 'backgroundContainer';
-    }, 1500);
+    // 更新下拉列表选中项
+    if (imageSelect) {
+        imageSelect.value = currentBgIndex;
+    }
 }
 
-// 格式化时间显示（分:秒）
+// 应用背景效果
+function applyBackgroundEffect(imageUrl, effect) {
+    if (!backgroundContainer) return;
+    
+    // 创建新的背景图层
+    const newBg = document.createElement('div');
+    newBg.className = 'background-layer';
+    newBg.style.backgroundImage = `url('${imageUrl}')`;
+    
+    // 根据效果应用不同的滤镜
+    switch (effect) {
+        case 'grayscale':
+            newBg.style.filter = 'grayscale(100%)';
+            break;
+        case 'sepia':
+            newBg.style.filter = 'sepia(70%)';
+            break;
+        case 'blur':
+            newBg.style.filter = 'blur(5px)';
+            break;
+        case 'brightness':
+            newBg.style.filter = 'brightness(120%)';
+            break;
+        case 'contrast':
+            newBg.style.filter = 'contrast(150%)';
+            break;
+        default:
+            newBg.style.filter = 'none';
+    }
+    
+    // 添加到容器
+    backgroundContainer.appendChild(newBg);
+    
+    // 触发重排
+    newBg.offsetHeight;
+    
+    // 添加动画类
+    setTimeout(() => {
+        newBg.classList.add('fade-in');
+    }, 10);
+    
+    // 移除旧的背景图层
+    const oldLayers = backgroundContainer.querySelectorAll('.background-layer:not(.fade-in)');
+    oldLayers.forEach(layer => {
+        layer.classList.add('fade-out');
+        setTimeout(() => {
+            layer.remove();
+        }, 500);
+    });
+}
+
+// 格式化时间
 function formatTime(milliseconds) {
-    let totalSeconds = Math.floor(milliseconds / 1000);
-    let minutes = Math.floor(totalSeconds / 60);
-    let seconds = totalSeconds % 60;
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const ms = Math.floor((milliseconds % 1000) / 10);
     
-    // 确保两位数显示
-    minutes = minutes.toString().padStart(2, '0');
-    seconds = seconds.toString().padStart(2, '0');
-    
-    return `${minutes}:${seconds}`;
+    // 根据是否有小时决定显示格式
+    if (hours > 0) {
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+    } else {
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+    }
 }
 
 // 更新计时器显示
 function updateTimer() {
-    const currentTime = Date.now();
-    elapsedTime = currentTime - startTime;
-    if (timerDisplay) {
-        timerDisplay.textContent = formatTime(elapsedTime);
-    }
+    if (!timerDisplay) return;
+    
+    const now = Date.now();
+    elapsedTime = now - startTime;
+    timerDisplay.textContent = formatTime(elapsedTime);
 }
 
-// 开始计时
+// 开始计时器
 function startTimer() {
-    if (!isRunning) {
-        startTime = Date.now() - elapsedTime;
-        timerInterval = setInterval(updateTimer, 100);
-        isRunning = true;
-        if (startPauseBtn) startPauseBtn.textContent = '⏸️';
-        
-        // 播放背景音乐
-        if (isMusicEnabled && musicFiles.length > 0) {
-            backgroundMusic.play().catch(e => {
-                console.log('自动播放被阻止，需要用户交互');
-            });
-        }
-        
-        showStatus('计时中...', 2000);
+    if (isRunning) return;
+    
+    isRunning = true;
+    startTime = Date.now() - elapsedTime;
+    timerInterval = setInterval(updateTimer, 10);
+    
+    // 更新按钮状态
+    if (startPauseBtn) {
+        startPauseBtn.textContent = '暂停';
+        startPauseBtn.classList.add('paused');
+    }
+    
+    // 更新状态指示器
+    if (statusIndicator) {
+        statusIndicator.textContent = '运行中';
+        statusIndicator.className = 'status-running';
     }
 }
 
-// 暂停计时
+// 暂停计时器
 function pauseTimer() {
-    if (isRunning) {
-        clearInterval(timerInterval);
-        isRunning = false;
-        if (startPauseBtn) startPauseBtn.textContent = '▶️';
-        
-        // 暂停背景音乐
-        backgroundMusic.pause();
-        
-        showStatus('已暂停', 2000);
+    if (!isRunning) return;
+    
+    isRunning = false;
+    clearInterval(timerInterval);
+    
+    // 更新按钮状态
+    if (startPauseBtn) {
+        startPauseBtn.textContent = '开始';
+        startPauseBtn.classList.remove('paused');
+    }
+    
+    // 更新状态指示器
+    if (statusIndicator) {
+        statusIndicator.textContent = '已暂停';
+        statusIndicator.className = 'status-paused';
     }
 }
 
-// 切换开始/暂停状态
+// 切换计时器状态
 function toggleTimer() {
     if (isRunning) {
         pauseTimer();
@@ -677,331 +754,465 @@ function toggleTimer() {
 
 // 重置计时器
 function resetTimer() {
-    clearInterval(timerInterval);
-    isRunning = false;
+    pauseTimer();
+    
     elapsedTime = 0;
-    if (timerDisplay) timerDisplay.textContent = '00:00';
-    if (startPauseBtn) startPauseBtn.textContent = '▶️';
+    if (timerDisplay) {
+        timerDisplay.textContent = formatTime(elapsedTime);
+    }
     
-    // 停止背景音乐
-    backgroundMusic.pause();
-    backgroundMusic.currentTime = 0;
-    
-    showStatus('已重置', 2000);
+    // 更新状态指示器
+    if (statusIndicator) {
+        statusIndicator.textContent = '已重置';
+        statusIndicator.className = 'status-reset';
+    }
 }
 
 // 切换控制面板显示
 function toggleControlPanel() {
+    if (!controlPanel) return;
+    
     isControlPanelVisible = !isControlPanelVisible;
-    if (controlPanel) {
-        controlPanel.classList.toggle('visible', isControlPanelVisible);
-    }
     
     if (isControlPanelVisible) {
-        // 3秒后自动隐藏
-        setTimeout(() => {
-            if (isControlPanelVisible) {
-                toggleControlPanel();
-            }
-        }, 3000);
+        controlPanel.classList.add('visible');
+    } else {
+        controlPanel.classList.remove('visible');
     }
 }
 
-// 切换屏幕布局
+// 切换布局
 function toggleLayout() {
-    const isPortrait = document.body.classList.contains('portrait');
+    if (!timerDisplay || !controlPanel) return;
     
-    // 移除现有方向类
-    document.body.classList.remove('portrait', 'landscape');
-    // 添加相反的方向类
-    document.body.classList.add(isPortrait ? 'landscape' : 'portrait');
+    // 检查当前是否为紧凑布局
+    const isCompact = document.body.classList.contains('compact-layout');
     
-    if (layoutBtn) layoutBtn.textContent = isPortrait ? '↔️' : '↕️';
-    
-    // 重新加载背景图片以匹配新布局
-    loadBackgroundImages();
-    // 应用当前背景图片
-    if (backgroundImages.length > 0) {
-        backgroundContainer.style.backgroundImage = `url('${backgroundImages[currentBgIndex % backgroundImages.length]}')`;
+    if (isCompact) {
+        // 切换到标准布局
+        document.body.classList.remove('compact-layout');
+        timerDisplay.style.fontSize = 'calc(10vmin + 5vmax)';
+        
+        if (layoutBtn) {
+            layoutBtn.textContent = '紧凑';
+        }
+    } else {
+        // 切换到紧凑布局
+        document.body.classList.add('compact-layout');
+        timerDisplay.style.fontSize = 'calc(8vmin + 4vmax)';
+        
+        if (layoutBtn) {
+            layoutBtn.textContent = '标准';
+        }
     }
 }
 
 // 显示设置面板
 function showSettings() {
-    if (settingsPanel) {
-        settingsPanel.classList.add('visible');
+    if (!settingsPanel) return;
+    
+    // 保存当前设置到面板
+    if (bgEffectSelect) bgEffectSelect.value = bgEffectSelect.value || 'normal';
+    if (bgRandomCheckbox) bgRandomCheckbox.checked = bgRandomCheckbox.checked || false;
+    if (volumeSlider) {
+        volumeSlider.value = musicVolume * 100;
+        updateVolumeDisplay();
     }
+    if (musicModeSelect) musicModeSelect.value = musicModeSelect.value || 'continuous';
+    if (musicEnabledCheckbox) musicEnabledCheckbox.checked = isMusicEnabled;
+    if (themeSelect) themeSelect.value = themeSelect.value || 'default';
+    if (fontSizeSlider) {
+        fontSizeSlider.value = fontSizeSlider.value || 100;
+        updateFontSizeDisplay();
+    }
+    if (customIntervalInput) customIntervalInput.value = bgInterval / 1000;
+    
+    // 显示设置面板
+    settingsPanel.classList.add('visible');
 }
 
 // 隐藏设置面板
 function hideSettings() {
-    if (settingsPanel) {
-        settingsPanel.classList.remove('visible');
-    }
+    if (!settingsPanel) return;
+    settingsPanel.classList.remove('visible');
 }
 
 // 显示帮助面板
 function showHelp() {
-    if (helpPanel) {
-        helpPanel.classList.add('visible');
-    }
+    if (!helpPanel) return;
+    
+    // 更新帮助面板中的模式信息
+    const { mode, modeText, isOnline, isPWA } = detectRunningMode();
+    updateHelpPanelModeInfo(mode, modeText, isOnline, isPWA);
+    
+    // 显示帮助面板
+    helpPanel.classList.add('visible');
 }
 
 // 隐藏帮助面板
 function hideHelp() {
-    if (helpPanel) {
-        helpPanel.classList.remove('visible');
-    }
+    if (!helpPanel) return;
+    helpPanel.classList.remove('visible');
 }
 
-// 显示状态提示
+// 显示状态消息
 function showStatus(message, duration = 2000) {
-    if (statusIndicator) {
-        statusIndicator.textContent = message;
-        statusIndicator.classList.add('visible');
-        
+    const statusDiv = document.createElement('div');
+    statusDiv.className = 'status-message';
+    statusDiv.textContent = message;
+    
+    document.body.appendChild(statusDiv);
+    
+    // 触发重排
+    statusDiv.offsetHeight;
+    
+    // 添加显示动画
+    setTimeout(() => {
+        statusDiv.classList.add('show');
+    }, 10);
+    
+    // 设置定时隐藏
+    setTimeout(() => {
+        statusDiv.classList.remove('show');
         setTimeout(() => {
-            statusIndicator.classList.remove('visible');
-        }, duration);
-    }
+            document.body.removeChild(statusDiv);
+        }, 300);
+    }, duration);
+}
+
+// 更新音量显示
+function updateVolumeDisplay() {
+    if (!volumeValue || !volumeSlider) return;
+    volumeValue.textContent = `${volumeSlider.value}%`;
+}
+
+// 更新字体大小显示
+function updateFontSizeDisplay() {
+    if (!fontSizeValue || !fontSizeSlider) return;
+    fontSizeValue.textContent = `${fontSizeSlider.value}%`;
 }
 
 // 设置事件监听器
 function setupEventListeners() {
-    // 调试信息
-    console.log('Setting up event listeners...');
-    console.log('closeHelp element:', closeHelp);
-    
-    // 按钮事件
-    if (startPauseBtn) startPauseBtn.addEventListener('click', toggleTimer);
-    if (resetBtn) resetBtn.addEventListener('click', resetTimer);
-    if (layoutBtn) layoutBtn.addEventListener('click', toggleLayout);
-    if (settingsBtn) settingsBtn.addEventListener('click', showSettings);
-    if (helpBtn) helpBtn.addEventListener('click', showHelp);
-    if (closeSettings) closeSettings.addEventListener('click', hideSettings);
-    if (closeHelp) closeHelp.addEventListener('click', hideHelp);
-    
-    // 设置面板分页事件
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.settings-content');
-    
-    if (tabButtons.length > 0 && tabContents.length > 0) {
-        tabButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                const tabId = this.getAttribute('data-tab');
-                
-                // 移除所有活动状态
-                tabButtons.forEach(btn => btn.classList.remove('active'));
-                tabContents.forEach(content => content.classList.remove('active'));
-                
-                // 添加活动状态到当前标签和内容
-                this.classList.add('active');
-                const contentElement = document.getElementById(`${tabId}-content`);
-                if (contentElement) {
-                    contentElement.classList.add('active');
-                }
-            });
-        });
-    }
-    
-    // 双击事件（开始/暂停）
-    if (document) document.addEventListener('dblclick', toggleTimer);
-    
-    // 单击事件（显示/隐藏控制面板）
-    if (document) document.addEventListener('click', (e) => {
-        // 检查点击是否在控制面板或按钮上
-        const isClickOnControlPanel = controlPanel && controlPanel.contains(e.target);
-        const isClickOnStartPauseBtn = startPauseBtn && startPauseBtn.contains(e.target);
-        const isClickOnResetBtn = resetBtn && resetBtn.contains(e.target);
-        const isClickOnLayoutBtn = layoutBtn && layoutBtn.contains(e.target);
-        const isClickOnSettingsBtn = settingsBtn && settingsBtn.contains(e.target);
-        const isClickOnHelpBtn = helpBtn && helpBtn.contains(e.target);
-        const isClickOnSettingsPanel = settingsPanel && settingsPanel.contains(e.target);
-        const isClickOnHelpPanel = helpPanel && helpPanel.contains(e.target);
+    // 开始/暂停按钮
+    if (startPauseBtn) {
+        startPauseBtn.addEventListener('click', toggleTimer);
         
-        if (!isClickOnControlPanel && 
-            !isClickOnStartPauseBtn && 
-            !isClickOnResetBtn && 
-            !isClickOnLayoutBtn && 
-            !isClickOnSettingsBtn && 
-            !isClickOnHelpBtn &&
-            !isClickOnSettingsPanel &&
-            !isClickOnHelpPanel) {
-            toggleControlPanel();
-        }
-    });
-    
-    // 键盘快捷键
-    if (document) document.addEventListener('keydown', (e) => {
-        // 防止重复触发
-        if (e.repeat) return;
-        
-        switch(e.code) {
-            case 'Space': // 空格键 - 开始/暂停
-                e.preventDefault();
-                toggleTimer();
-                break;
-            case 'Enter': // 回车键 - 重置
-                e.preventDefault();
-                resetTimer();
-                break;
-            case 'KeyL': // L键 - 切换布局
-                e.preventDefault();
-                toggleLayout();
-                break;
-            case 'KeyS': // S键 - 显示设置
-                e.preventDefault();
-                showSettings();
-                break;
-            case 'Escape': // ESC键 - 隐藏设置或帮助
-                e.preventDefault();
-                hideSettings();
-                hideHelp();
-                break;
-            case 'KeyB': // B键 - 切换背景
-                e.preventDefault();
-                changeBackground();
-                break;
-            case 'KeyM': // M键 - 切换音乐开关
-                e.preventDefault();
-                if (musicEnabledCheckbox) {
-                    musicEnabledCheckbox.checked = !musicEnabledCheckbox.checked;
-                    isMusicEnabled = musicEnabledCheckbox.checked;
-                }
-                break;
-            case 'KeyH': // H键 - 显示帮助
-                e.preventDefault();
-                showHelp();
-                break;
-        }
-    });
-    
-    // 设置面板事件
-    // 背景间隔按钮事件
-    const intervalButtons = document.querySelectorAll('.interval-btn');
-    if (intervalButtons.length > 0) {
-        intervalButtons.forEach(btn => {
-            btn.addEventListener('click', function() {
-                // 移除所有active类
-                document.querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
-                // 添加active类到当前按钮
-                this.classList.add('active');
-                
-                // 设置间隔时间
-                const interval = parseInt(this.getAttribute('data-interval'));
-                bgInterval = interval * 1000;
-                startBackgroundCycle();
-            });
-        });
-    }
-    
-    // 自定义间隔输入事件
-    if (customIntervalInput) {
-        customIntervalInput.addEventListener('input', function() {
-            // 移除所有按钮的active类
-            document.querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+        // 添加双击检测（防止误触）
+        startPauseBtn.addEventListener('touchstart', function(e) {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTapTime;
             
-            // 验证输入值
-            let value = parseInt(this.value);
-            if (isNaN(value) || value < 5) {
-                value = 5;
-                this.value = value;
-            } else if (value > 300) {
-                value = 300;
-                this.value = value;
+            if (tapLength < 300 && tapLength > 0) {
+                // 双击事件，不执行操作
+                e.preventDefault();
+            } else {
+                // 单击事件，延迟执行以检测双击
+                setTimeout(() => {
+                    toggleTimer();
+                }, 300);
             }
             
-            // 设置间隔时间
-            bgInterval = value * 1000;
+            lastTapTime = currentTime;
+        });
+    }
+    
+    // 重置按钮
+    if (resetBtn) {
+        resetBtn.addEventListener('click', resetTimer);
+    }
+    
+    // 布局切换按钮
+    if (layoutBtn) {
+        layoutBtn.addEventListener('click', toggleLayout);
+    }
+    
+    // 设置按钮
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', showSettings);
+    }
+    
+    // 关闭设置按钮
+    if (closeSettings) {
+        closeSettings.addEventListener('click', hideSettings);
+    }
+    
+    // 帮助按钮
+    if (helpBtn) {
+        helpBtn.addEventListener('click', showHelp);
+    }
+    
+    // 关闭帮助按钮
+    if (closeHelp) {
+        closeHelp.addEventListener('click', hideHelp);
+    }
+    
+    // 点击设置面板外部关闭
+    if (settingsPanel) {
+        settingsPanel.addEventListener('click', function(e) {
+            if (e.target === settingsPanel) {
+                hideSettings();
+            }
+        });
+    }
+    
+    // 点击帮助面板外部关闭
+    if (helpPanel) {
+        helpPanel.addEventListener('click', function(e) {
+            if (e.target === helpPanel) {
+                hideHelp();
+            }
+        });
+    }
+    
+    // 背景效果选择
+    if (bgEffectSelect) {
+        bgEffectSelect.addEventListener('change', function() {
+            const selectedImage = backgroundImages[currentBgIndex];
+            if (selectedImage && selectedImage.url) {
+                applyBackgroundEffect(selectedImage.url, this.value);
+            }
+        });
+    }
+    
+    // 随机背景选项
+    if (bgRandomCheckbox) {
+        bgRandomCheckbox.addEventListener('change', function() {
+            // 重启背景循环以应用新设置
             startBackgroundCycle();
         });
     }
     
+    // 音量调节
     if (volumeSlider) {
-        volumeSlider.addEventListener('input', () => {
-            musicVolume = volumeSlider.value / 100;
-            if (volumeValue) volumeValue.textContent = `${volumeSlider.value}%`;
-            if (backgroundMusic) backgroundMusic.volume = musicVolume;
-        });
-    }
-    
-    if (musicEnabledCheckbox) {
-        musicEnabledCheckbox.addEventListener('change', () => {
-            isMusicEnabled = musicEnabledCheckbox.checked;
-            if (!isMusicEnabled && !isRunning && backgroundMusic) {
-                backgroundMusic.pause();
+        volumeSlider.addEventListener('input', function() {
+            updateVolumeDisplay();
+            musicVolume = this.value / 100;
+            if (backgroundMusic) {
+                backgroundMusic.volume = musicVolume;
             }
         });
     }
     
-    if (fontSizeSlider) {
-        fontSizeSlider.addEventListener('input', () => {
-            const fontSize = fontSizeSlider.value;
-            if (fontSizeValue) fontSizeValue.textContent = `${fontSize}%`;
-            if (timerDisplay) timerDisplay.style.fontSize = `calc(20vw * ${fontSize / 100})`;
+    // 音乐模式选择
+    if (musicModeSelect) {
+        musicModeSelect.addEventListener('change', function() {
+            // 根据选择的模式设置音频循环
+            if (backgroundMusic) {
+                if (this.value === 'loop') {
+                    backgroundMusic.loop = true;
+                } else {
+                    backgroundMusic.loop = false;
+                    // 如果是连续播放模式，添加ended事件监听器
+                    backgroundMusic.addEventListener('ended', handleMusicEnded);
+                }
+            }
         });
     }
     
+    // 音乐开关
+    if (musicEnabledCheckbox) {
+        musicEnabledCheckbox.addEventListener('change', function() {
+            isMusicEnabled = this.checked;
+            
+            if (backgroundMusic) {
+                if (isMusicEnabled) {
+                    backgroundMusic.play().catch(e => {
+                        console.log('音乐播放被阻止，需要用户交互');
+                        showStatus('点击任意位置后重试音乐播放', 3000);
+                    });
+                } else {
+                    backgroundMusic.pause();
+                }
+            }
+        });
+    }
+    
+    // 主题选择
     if (themeSelect) {
-        themeSelect.addEventListener('change', () => {
-            const theme = themeSelect.value;
-            applyTheme(theme);
+        themeSelect.addEventListener('change', function() {
+            applyTheme(this.value);
         });
     }
     
-    // 图片选择下拉框事件
+    // 字体大小调节
+    if (fontSizeSlider) {
+        fontSizeSlider.addEventListener('input', function() {
+            updateFontSizeDisplay();
+            updateFontSize();
+        });
+    }
+    
+    // 背景图片选择
     if (imageSelect) {
         imageSelect.addEventListener('change', function() {
-            const index = parseInt(this.value);
-            if (!isNaN(index) && index >= 0 && index < backgroundImages.length) {
-                currentBgIndex = index;
-                if (backgroundContainer) backgroundContainer.style.backgroundImage = `url('${backgroundImages[index]}')`;
-                updateImageList();
+            currentBgIndex = parseInt(this.value);
+            const selectedImage = backgroundImages[currentBgIndex];
+            if (selectedImage && selectedImage.url) {
+                applyBackgroundEffect(selectedImage.url, bgEffectSelect ? bgEffectSelect.value : 'normal');
             }
         });
     }
     
-    // 音频列表选择事件
+    // 背景音乐选择
     if (musicSelect) {
         musicSelect.addEventListener('change', function() {
-            const index = parseInt(this.value);
+            currentMusicIndex = parseInt(this.value);
+            const selectedMusic = musicFiles[currentMusicIndex];
             
-            // 如果选择了空白项，停止播放
-            if (isNaN(index) || index < 0 || index >= musicFiles.length) {
-                backgroundMusic.pause();
-                backgroundMusic.currentTime = 0;
-                return;
+            if (selectedMusic && backgroundMusic) {
+                // 使用动态码率适配设置音频源
+                setAudioSourceWithAdaptiveBitrate(backgroundMusic, selectedMusic);
+                backgroundMusic.volume = musicVolume;
+                
+                // 如果音乐已启用，则播放
+                if (isMusicEnabled) {
+                    backgroundMusic.play().catch(e => {
+                        console.log('音频播放被阻止，需要用户交互');
+                    });
+                }
             }
-            
-            // 预览播放对应的音频，使用动态码率适配
-            setAudioSourceWithAdaptiveBitrate(backgroundMusic, musicFiles[index]);
-            backgroundMusic.volume = musicVolume;
+        });
+    }
+    
+    // 自定义背景切换间隔
+    if (customIntervalInput) {
+        customIntervalInput.addEventListener('change', function() {
+            let newInterval = parseInt(this.value) * 1000;
+            if (!isNaN(newInterval) && newInterval > 0) {
+                bgInterval = newInterval;
+                startBackgroundCycle(); // 重启循环以应用新间隔
+            }
+        });
+    }
+    
+    // 点击文档时尝试播放音乐（解决自动播放限制）
+    document.addEventListener('click', function() {
+        if (isMusicEnabled && backgroundMusic && backgroundMusic.paused) {
             backgroundMusic.play().catch(e => {
-                console.log('音频播放被阻止，需要用户交互');
+                console.log('尝试播放音乐失败:', e);
             });
-        });
-    }
+        }
+    });
     
-    // 当离开设置页面时停止播放
-    if (closeSettings) {
-        closeSettings.addEventListener('click', function() {
-            backgroundMusic.pause();
-            backgroundMusic.currentTime = 0;
-            hideSettings(); // 调用隐藏设置面板函数
-        });
-    }
+    // 键盘快捷键
+    document.addEventListener('keydown', function(e) {
+        // 空格键控制开始/暂停
+        if (e.code === 'Space') {
+            e.preventDefault(); // 防止页面滚动
+            toggleTimer();
+        }
+        
+        // R键重置
+        if (e.code === 'KeyR') {
+            resetTimer();
+        }
+        
+        // S键显示/隐藏设置
+        if (e.code === 'KeyS') {
+            if (settingsPanel && settingsPanel.classList.contains('visible')) {
+                hideSettings();
+            } else {
+                showSettings();
+            }
+        }
+        
+        // H键显示/隐藏帮助
+        if (e.code === 'KeyH') {
+            if (helpPanel && helpPanel.classList.contains('visible')) {
+                hideHelp();
+            } else {
+                showHelp();
+            }
+        }
+        
+        // ESC键关闭所有面板
+        if (e.code === 'Escape') {
+            hideSettings();
+            hideHelp();
+        }
+    });
     
-    // 当点击设置面板外部时停止播放
-    if (settingsPanel) {
-        settingsPanel.addEventListener('click', function(e) {
-            // 检查点击是否在设置面板外部
-            if (e.target === settingsPanel) {
-                backgroundMusic.pause();
-                backgroundMusic.currentTime = 0;
-                hideSettings(); // 调用隐藏设置面板函数
+    // 触摸事件：双击切换控制面板
+    document.addEventListener('dblclick', function() {
+        toggleControlPanel();
+    });
+    
+    // 触摸事件：双击切换控制面板（移动设备）
+    let touchStartTime = 0;
+    let touchEndTime = 0;
+    let tapCount = 0;
+    
+    document.addEventListener('touchstart', function() {
+        touchStartTime = new Date().getTime();
+    });
+    
+    document.addEventListener('touchend', function() {
+        touchEndTime = new Date().getTime();
+        
+        // 如果触摸时间很短，认为是点击
+        if (touchEndTime - touchStartTime < 200) {
+            tapCount++;
+            
+            // 检测双击
+            setTimeout(() => {
+                if (tapCount === 2) {
+                    toggleControlPanel();
+                }
+                tapCount = 0;
+            }, 300);
+        }
+    });
+    
+    // 调整音频播放器事件
+    if (backgroundMusic) {
+        backgroundMusic.addEventListener('error', function(e) {
+            console.error('音频加载错误:', e);
+            showStatus('音频加载失败，尝试其他音频', 3000);
+            
+            // 尝试下一个音频
+            currentMusicIndex = (currentMusicIndex + 1) % musicFiles.length;
+            const nextMusic = musicFiles[currentMusicIndex];
+            
+            if (nextMusic) {
+                setAudioSourceWithAdaptiveBitrate(backgroundMusic, nextMusic);
+                if (isMusicEnabled) {
+                    backgroundMusic.play().catch(e => {
+                        console.log('音频播放被阻止');
+                    });
+                }
             }
         });
     }
+}
+
+// 处理音乐播放结束
+function handleMusicEnded() {
+    if (!backgroundMusic || !isMusicEnabled) return;
+    
+    // 根据音乐模式选择下一步操作
+    if (musicModeSelect && musicModeSelect.value === 'continuous') {
+        // 连续播放模式，播放下一首
+        currentMusicIndex = (currentMusicIndex + 1) % musicFiles.length;
+        const nextMusic = musicFiles[currentMusicIndex];
+        
+        if (nextMusic) {
+            setAudioSourceWithAdaptiveBitrate(backgroundMusic, nextMusic);
+            backgroundMusic.play().catch(e => {
+                console.log('音频播放被阻止');
+            });
+            
+            // 更新下拉列表选中项
+            if (musicSelect) {
+                musicSelect.value = currentMusicIndex;
+            }
+        }
+    } else if (musicModeSelect && musicModeSelect.value === 'single') {
+        // 单曲播放模式，停止
+        backgroundMusic.pause();
+        backgroundMusic.currentTime = 0;
+    }
+    // loop模式由audio元素的loop属性处理
 }
 
 // 应用主题

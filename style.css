@@ -437,83 +437,180 @@ body.landscape .control-panel {
 }
 
 .help-content {
-    line-height: 1.6;
+    max-width: 800px;
+    margin: 0 auto;
 }
 
-.help-content h3 {
-    margin: 20px 0 10px;
+.help-section {
+    margin-bottom: 25px;
+}
+
+.help-section h3 {
     color: #4fc3f7;
+    margin-bottom: 10px;
+    font-size: 18px;
 }
 
-.help-content ul {
-    margin-left: 20px;
-    margin-bottom: 20px;
+.help-section p {
+    margin-bottom: 10px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
 }
 
-.help-content li {
+.help-section ul {
+    padding-left: 20px;
+    margin-bottom: 15px;
+}
+
+.help-section li {
     margin-bottom: 8px;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.9);
 }
 
-/* 响应式调整 */
-/* 手机竖屏模式字体大小设置 - 25%视口宽度（适用于屏幕宽度≤768px的设备） */
+.keyboard-shortcut {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    margin: 0 5px;
+}
+
+/* 模式说明卡片 */
+.mode-card {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(5px);
+}
+
+.mode-card h4 {
+    color: #4fc3f7;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.mode-card p {
+    margin-bottom: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* 响应式设计 */
 @media (max-width: 768px) {
     .timer-display {
         font-size: 25vw;
     }
     
-    .control-btn {
-        width: 55px;
-        height: 55px;
-        font-size: 22px;
-    }
-    
-    .settings-panel, .help-panel {
+    .settings-panel,
+    .help-panel {
         padding: 20px;
     }
-}
-
-/* 手机横屏模式字体大小设置 - 20%视口宽度（适用于屏幕高度≤500px且为横屏的设备） */
-@media (max-height: 500px) and (orientation: landscape) {
-    .timer-display {
-        font-size: 20vw;
+    
+    .control-btn {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
     }
 }
 
-/* 背景间隔选项样式 */
-.interval-options {
+@media (max-width: 480px) {
+    .timer-display {
+        font-size: 30vw;
+    }
+    
+    .settings-title,
+    .help-title {
+        font-size: 20px;
+    }
+    
+    .control-btn {
+        width: 45px;
+        height: 45px;
+        font-size: 18px;
+    }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+    /* 增强深色模式下的对比度 */
+    .help-panel,
+    .settings-panel {
+        background-color: rgba(0, 0, 0, 0.95);
+    }
+}
+
+/* 加载动画 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+/* 开关按钮样式 */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider-toggle {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.2);
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.slider-toggle:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider-toggle {
+    background-color: #4fc3f7;
+}
+
+input:checked + .slider-toggle:before {
+    transform: translateX(26px);
+}
+
+/* 倒计时设置面板 */
+.countdown-settings {
     display: flex;
     align-items: center;
     gap: 10px;
-    width: 70%;
 }
 
-.interval-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: white;
-    padding: 8px 12px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.2s;
-}
-
-.interval-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.interval-btn.active {
-    background: #4fc3f7;
-    border-color: #4fc3f7;
-}
-
-.custom-interval {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.custom-interval input {
+.countdown-input {
     width: 60px;
     background: rgba(255, 255, 255, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.3);
